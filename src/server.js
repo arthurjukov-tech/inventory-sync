@@ -6,42 +6,50 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// HEALTH CHECK
+// Root - return JSON like an API
+app.get("/", (req, res) => {
+  res.json({ service: "inventory-sync", status: "running" });
+});
+
+// Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
 // Get all products
 app.get("/products", async (req, res) => {
-  const { data, error } = await supabase.from("products").select("*");
-  if (error) return res.status(500).json({ error });
-  res.json(data);
+  try {
+    const { data, error } = await supabase.from("products").select("*");
+    if (error) throw error;
+    res.json(data ?? []);
+  } catch (err) {
+    res.status(500).json({ error: err.message || err });
+  }
 });
 
-// Add product
+// Add product (example)
 app.post("/products", async (req, res) => {
-  const { name, price, stock } = req.body;
-
-  const { data, error } = await supabase
-    .from("products")
-    .insert([{ name, price, stock }]);
-
-  if (error) return res.status(500).json({ error });
-  res.json(data);
+  try {
+    const payload = req.body; // e.g. { title, sku, price_cents, category, images }
+    const { data, error } = await supabase.from("products").insert([payload]).select();
+    if (error) throw error;
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message || err });
+  }
 });
 
-// Update stock
+// Update product or stock (example)
 app.patch("/products/:id", async (req, res) => {
-  const { stock } = req.body;
-  const { id } = req.params;
-
-  const { data, error } = await supabase
-    .from("products")
-    .update({ stock })
-    .eq("id", id);
-
-  if (error) return res.status(500).json({ error });
-  res.json(data);
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    const { data, error } = await supabase.from("products").update(updates).eq("id", id).select();
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message || err });
+  }
 });
 
 const PORT = process.env.PORT || 10000;
